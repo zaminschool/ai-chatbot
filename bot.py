@@ -3,8 +3,9 @@ import asyncio
 import logging
 from service import chatbot
 from dotenv import load_dotenv
-from aiogram.types import Message
 from aiogram import Bot, Dispatcher, F
+from buttons import referral_keyboard
+from aiogram.types import Message, CallbackQuery
 from aiogram.filters.command import CommandStart, CommandObject
 from database import create_table_users, add_user, increment_ai_count, check_user, get_connection, get_referral_link
 
@@ -30,11 +31,23 @@ async def start_handler(message: Message, command: CommandObject):
 
 @dp.message(F.text)
 async def ai_chatbot(message: Message):
-    blocked = increment_ai_count(message.from_user.id)
+    if not check_user(message.from_user.id):
+        add_user(
+            fullname=message.from_user.full_name,
+            username=message.from_user.username,
+            user_id=message.from_user.id
+        )
+
+    blocked = increment_ai_count(
+        message.from_user.id
+    )
+
     if blocked:
-        referral_link = get_referral_link(message.from_user.id, "zaminclass8_bot")
         await message.answer(
-            f"""Limit tugadi (10/10) 1 ta odam taklif qiling va limit reset bo'ladi.\nReferral:{referral_link}""")
+            "Limit tugagan (10/10)\n\n"
+            "1 ta user taklif qiling va limit reset bo‘ladi.",
+            reply_markup=referral_keyboard()
+        )
     else:
         sent_message = await message.answer("...")
 
@@ -67,6 +80,23 @@ async def ai_chatbot(message: Message):
             await sent_message.edit_text(
                 f"Xatolik yuz berdi:\n{str(e)}"
             )
+
+
+@dp.callback_query(F.data == "get_referral")
+async def get_referral_callback(
+        callback: CallbackQuery
+):
+    referral_link = (
+        f"https://t.me/zaminclass8_bot"
+        f"?start=ref_{callback.from_user.id}"
+    )
+
+    await callback.message.answer(
+        f"Referral link:\n\n{referral_link}\n\n"
+        "1 ta odam kirsa limit reset bo‘ladi."
+    )
+
+    await callback.answer()
 
 
 async def main():
